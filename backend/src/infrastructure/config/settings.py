@@ -1,17 +1,27 @@
+import os
+from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings
+
+load_dotenv()
 
 
 class Settings(BaseSettings):
     # Database
     database_url: str = Field(
-        default="postgresql://postgres:postgres@localhost:5432/postgres",
+        default=os.getenv(
+            key="DATABASE_URL",
+            default="postgresql://postgres:postgres@localhost:5432/postgres"
+        ),
         description="Database connection URL"
     )
 
     # JWT Security
     secret_key: str = Field(
-        default="your-secret-key-change-in-production",
+        default=os.getenv(
+            key="JWT_SECRET_KEY",
+            default="your-secret-key-change-in-production"
+        ),
         description="Secret key for JWT"
     )
     algorithm: str = Field(default="HS256", description="JWT algorithm")
