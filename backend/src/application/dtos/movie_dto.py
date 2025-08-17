@@ -72,6 +72,9 @@ class MovieResponseDTO(BaseModel):
     year: Optional[str] = Field(None, description="Release year")
     created_at: datetime
     updated_at: Optional[datetime]
+    is_liked: Optional[bool] = Field(
+        None, description="Whether the current user liked this movie"
+    )
 
     class Config:
         from_attributes = True

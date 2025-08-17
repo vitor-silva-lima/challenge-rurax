@@ -1,18 +1,26 @@
 from src.domain.entities.movie import Movie
 from src.domain.repositories.movie_repository import MovieRepository
+from src.domain.repositories.like_repository import LikeRepository
 from src.application.dtos.movie_dto import (
     MovieListResponseDTO,
     MovieResponseDTO
 )
+from typing import Optional
 
 
 class GetMoviesUseCase:
 
-    def __init__(self, movie_repository: MovieRepository):
+    def __init__(
+        self,
+        movie_repository: MovieRepository,
+        like_repository: LikeRepository
+    ):
         self.movie_repository = movie_repository
+        self.like_repository = like_repository
 
     def execute(
         self,
+        user_id: Optional[int] = None,
         page: int = 1,
         per_page: int = 20,
         search_query: str = None
@@ -37,7 +45,7 @@ class GetMoviesUseCase:
             )
 
         # Convert to DTOs
-        movie_dtos = [self._movie_to_dto(movie) for movie in movies]
+        movie_dtos = [self._movie_to_dto(movie, user_id) for movie in movies]
 
         # Calculate pagination info
         total_pages = (total + per_page - 1) // per_page
@@ -50,7 +58,16 @@ class GetMoviesUseCase:
             per_page=per_page
         )
 
-    def _movie_to_dto(self, movie: Movie) -> MovieResponseDTO:
+    def _movie_to_dto(
+        self, movie: Movie, user_id: Optional[int] = None
+    ) -> MovieResponseDTO:
+        # Check if user liked this movie
+        is_liked = None
+        if user_id is not None:
+            like = self.like_repository.get_by_user_and_movie(
+                user_id, movie.id
+            )
+            is_liked = like is not None
         return MovieResponseDTO(
             id=movie.id,
             tmdb_id=movie.tmdb_id,
@@ -67,5 +84,6 @@ class GetMoviesUseCase:
             original_language=movie.original_language,
             year=movie.get_year(),
             created_at=movie.created_at,
-            updated_at=movie.updated_at
+            updated_at=movie.updated_at,
+            is_liked=is_liked
         )

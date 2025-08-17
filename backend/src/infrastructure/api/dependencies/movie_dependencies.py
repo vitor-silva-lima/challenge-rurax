@@ -27,10 +27,11 @@ def get_like_repository(db: Session = Depends(get_db)) -> LikeRepositoryImpl:
 
 
 def get_movies_use_case(
-    movie_repository: MovieRepositoryImpl = Depends(get_movie_repository)
+    movie_repository: MovieRepositoryImpl = Depends(get_movie_repository),
+    like_repository: LikeRepositoryImpl = Depends(get_like_repository)
 ) -> GetMoviesUseCase:
     """Get movies use case instance."""
-    return GetMoviesUseCase(movie_repository)
+    return GetMoviesUseCase(movie_repository, like_repository)
 
 
 def get_popular_movies_use_case(
