@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { AuthForm } from "@/components/ui/auth-form";
 import { Header } from "@/components/dashboard/header";
 import { MovieGrid } from "@/components/dashboard/movie-grid";
-import { apiClient, type Movie, type MovieListResponse, type RecommendationAlgorithm } from "@/lib/api";
+import { apiClient, type Movie, type MovieListResponse, type RecommendationAlgorithm, type CsvUploadResponse } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
@@ -18,6 +18,21 @@ export function MovieApp() {
   const [recommendationsPage, setRecommendationsPage] = useState(1);
   const [recommendationsTotalPages, setRecommendationsTotalPages] = useState(1);
   const { toast } = useToast();
+
+  // Configurar callback de logout automático
+  useEffect(() => {
+    apiClient.setLogoutCallback(() => {
+      setIsAuthenticated(false);
+      setMovies([]);
+      setRecommendations([]);
+      
+      toast({
+        title: "Sessão expirada",
+        description: "Sua sessão expirou. Faça login novamente para continuar.",
+        variant: "destructive"
+      });
+    });
+  }, [toast]);
 
   // Check authentication on mount
   useEffect(() => {
@@ -45,7 +60,7 @@ export function MovieApp() {
       setIsLoading(true);
       
       // Load movies with pagination
-      const moviesResponse = await apiClient.getMovies(page, 20);
+      const moviesResponse = await apiClient.getMovies(page, 10);
       setMovies(moviesResponse.movies);
       setMoviesPage(moviesResponse.page);
       setMoviesTotalPages(moviesResponse.total_pages);
@@ -69,7 +84,7 @@ export function MovieApp() {
 
   const loadRecommendations = async (algorithm: RecommendationAlgorithm, page: number = 1) => {
     try {
-      const recommendationsResponse = await apiClient.getRecommendations(algorithm, page, 20);
+      const recommendationsResponse = await apiClient.getRecommendations(algorithm, page, 10);
       setRecommendations([...recommendationsResponse.movies]); // Force re-render with spread operator
       setRecommendationsPage(recommendationsResponse.page);
       setRecommendationsTotalPages(recommendationsResponse.total_pages);
@@ -141,6 +156,16 @@ export function MovieApp() {
     });
   };
 
+  const handleCsvUploadSuccess = async (result: CsvUploadResponse) => {
+    // Recarregar dados após upload bem-sucedido
+    try {
+      await loadMovieData(1); // Voltar para primeira página
+      await loadRecommendations(selectedAlgorithm, 1); // Recarregar recomendações
+    } catch (error) {
+      console.error("Erro ao recarregar dados após upload:", error);
+    }
+  };
+
   const handleLike = async (movieId: number, liked: boolean) => {
     try {
       const response = await apiClient.toggleLike(movieId);
@@ -162,7 +187,7 @@ export function MovieApp() {
       setTimeout(async () => {
         try {
           // Refresh "🎬 Descobrir Filmes" list on current page
-          const moviesResponse = await apiClient.getMovies(moviesPage, 20);
+          const moviesResponse = await apiClient.getMovies(moviesPage, 10);
           setMovies([...moviesResponse.movies]); // Force re-render with spread operator
           
           // Refresh recommendations list on current page (only if we have recommendations)
@@ -208,7 +233,7 @@ export function MovieApp() {
 
   return (
     <div className="min-h-screen cinema-backdrop">
-      <Header onLogout={handleLogout} />
+      <Header onLogout={handleLogout} onCsvUploadSuccess={handleCsvUploadSuccess} />
       
       <main className="container mx-auto px-4 py-8 space-y-12">
         {/* Informational Banner */}

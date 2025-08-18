@@ -63,15 +63,38 @@ interface LikeToggleResponse {
   } | null;
 }
 
+interface CsvUploadResponse {
+  success: boolean;
+  message: string;
+  total_rows: number;
+  created_count: number;
+  updated_count: number;
+  errors: string[];
+}
+
+interface ValidationError {
+  detail: Array<{
+    loc: (string | number)[];
+    msg: string;
+    type: string;
+  }>;
+}
+
 type RecommendationAlgorithm = 'popularity' | 'collaborative' | 'content_based';
 
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
+  private onLogoutCallback?: () => void;
 
   constructor(baseURL: string) {
     this.baseURL = baseURL;
     this.token = localStorage.getItem("auth_token");
+  }
+
+  // Método para registrar callback de logout
+  setLogoutCallback(callback: () => void): void {
+    this.onLogoutCallback = callback;
   }
 
   private async request<T>(
@@ -94,6 +117,22 @@ class ApiClient {
     });
 
     if (!response.ok) {
+      // Verificar se é erro de autenticação/autorização
+      if (response.status === 401 || response.status === 403) {
+        // Fazer logout automático
+        this.logout();
+        
+        // Disparar callback se registrado
+        if (this.onLogoutCallback) {
+          this.onLogoutCallback();
+        }
+        
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.message || `Sessão expirada. Faça login novamente.`
+        );
+      }
+      
       const errorData = await response.json().catch(() => ({}));
       throw new Error(
         errorData.message || `HTTP error! status: ${response.status}`
@@ -128,14 +167,14 @@ class ApiClient {
   }
 
   // Movie methods
-  async getMovies(page: number = 1, perPage: number = 20): Promise<MovieListResponse> {
+  async getMovies(page: number = 1, perPage: number = 10): Promise<MovieListResponse> {
     return this.request<MovieListResponse>(`/movies/?page=${page}&per_page=${perPage}`);
   }
 
   async getRecommendations(
     algorithm: RecommendationAlgorithm = 'collaborative', 
     page: number = 1, 
-    perPage: number = 20
+    perPage: number = 10
   ): Promise<MovieListResponse> {
     return this.request<MovieListResponse>(
       `/recommendations/?algorithm=${algorithm}&page=${page}&per_page=${perPage}`
@@ -147,6 +186,75 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify({ movie_id: movieId }),
     });
+  }
+
+  // CSV methods
+  async downloadCsvTemplate(): Promise<Blob> {
+    const url = `${this.baseURL}/csv/template`;
+    const headers: Record<string, string> = {};
+
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers,
+    });
+
+    if (!response.ok) {
+      // Verificar se é erro de autenticação/autorização
+      if (response.status === 401 || response.status === 403) {
+        this.logout();
+        if (this.onLogoutCallback) {
+          this.onLogoutCallback();
+        }
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+      throw new Error(`Erro ao baixar template: ${response.status}`);
+    }
+
+    return response.blob();
+  }
+
+  async uploadCsv(file: File): Promise<CsvUploadResponse> {
+    const url = `${this.baseURL}/csv/upload`;
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const headers: Record<string, string> = {};
+
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      // Verificar se é erro de autenticação/autorização
+      if (response.status === 401 || response.status === 403) {
+        this.logout();
+        if (this.onLogoutCallback) {
+          this.onLogoutCallback();
+        }
+        throw new Error("Sessão expirada. Faça login novamente.");
+      }
+      
+      if (response.status === 422) {
+        const validationError = responseData as ValidationError;
+        const errorMessages = validationError.detail.map(err => err.msg).join(', ');
+        throw new Error(`Erro de validação: ${errorMessages}`);
+      }
+      throw new Error(responseData.message || `Erro no upload: ${response.status}`);
+    }
+
+    return responseData as CsvUploadResponse;
   }
 
   // Utility methods
@@ -161,5 +269,7 @@ export type {
   MovieListResponse, 
   AuthResponse, 
   LikeToggleResponse, 
+  CsvUploadResponse,
+  ValidationError,
   RecommendationAlgorithm 
 };

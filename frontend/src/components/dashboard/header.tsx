@@ -8,12 +8,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CsvActions } from "@/components/ui/csv-actions";
+import type { CsvUploadResponse } from "@/lib/api";
 
 interface HeaderProps {
   onLogout: () => void;
+  onCsvUploadSuccess?: (result: CsvUploadResponse) => void;
 }
 
-export function Header({ onLogout }: HeaderProps) {
+export function Header({ onLogout, onCsvUploadSuccess }: HeaderProps) {
 
   return (
     <header className="border-b border-border/50 bg-card/50 backdrop-blur-sm sticky top-0 z-40">
@@ -26,8 +29,13 @@ export function Header({ onLogout }: HeaderProps) {
           </span>
         </div>
 
-        {/* User Menu */}
-        <DropdownMenu>
+        {/* Ações e User Menu */}
+        <div className="flex items-center gap-4">
+          {/* CSV Actions */}
+          <CsvActions onUploadSuccess={onCsvUploadSuccess} />
+
+          {/* User Menu */}
+          <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="relative h-10 w-10 rounded-full">
               <Avatar className="h-10 w-10 border-2 border-primary/20">
@@ -46,7 +54,8 @@ export function Header({ onLogout }: HeaderProps) {
               Sair
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );
