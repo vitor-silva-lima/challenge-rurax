@@ -158,19 +158,6 @@ recommendation_service.register_strategy(
 )
 ```
 
-### Testes por Camada
-
-```bash
-# Testes de domínio (sem dependências externas)
-pytest tests/domain/ -v
-
-# Testes de aplicação (mocks para infraestrutura)
-pytest tests/application/ -v
-
-# Testes de infraestrutura (integração)
-pytest tests/infrastructure/ -v
-```
-
 ## 🎯 Casos de Uso Implementados
 
 ### Autenticação
@@ -182,31 +169,6 @@ pytest tests/infrastructure/ -v
 - ⏳ **LikeMovieUseCase**: Curtir filme
 - ⏳ **GetRecommendationsUseCase**: Obter recomendações
 
-
-## 🧪 Exemplo de Uso
-
-### 1. Registrar Usuário
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/register" \
--H "Content-Type: application/json" \
--d '{
-  "username": "usuario",
-  "email": "user@example.com",
-  "password": "senha123"
-}'
-```
-
-### 2. Fazer Login
-```bash
-curl -X POST "http://localhost:8000/api/v1/auth/login-json" \
--H "Content-Type: application/json" \
--d '{
-  "username": "usuario",
-  "password": "senha123"
-}'
-```
-
-## 📚 Recursos de Estudo
 
 ### Clean Architecture
 - [Clean Architecture (Robert C. Martin)](https://blog.cleancoder.com/uncle-bob/2012/08/13/the-clean-architecture.html)
@@ -233,7 +195,59 @@ Resposta esperada:
   "version": "2.0.0"
 }
 ```
-
+graph TB
+    subgraph "🎯 Recommendation System"
+        U[👤 User] --> RS[🧠 RecommendationService]
+        RS --> SF[🏭 StrategyFactory]
+    end
+    
+    SF --> A{📊 Choose Algorithm}
+    
+    A -->|User-User| CF[🤝 Collaborative Filtering]
+    A -->|Item-Item| CB[🎬 Content-Based]
+    A -->|General| POP[📈 Popularity]
+    
+    subgraph "🤝 Collaborative Strategy"
+        CF --> UM[📊 User-Movie Matrix]
+        UM --> CS[🔍 Cosine Similarity<br/>scikit-learn]
+        CS --> SU[👥 Find Similar Users]
+        SU --> REC1[🎯 Recommend from<br/>Similar Users]
+    end
+    
+    subgraph "🎬 Content-Based Strategy"
+        CB --> LM[📽️ User's Liked Movies]
+        LM --> FE[📝 Extract Features<br/>Genres + Title + Overview]
+        FE --> TF[🔤 TF-IDF Vectorizer<br/>scikit-learn]
+        TF --> CS2[🔍 Cosine Similarity<br/>Movie-Movie]
+        CS2 --> REC2[🎯 Recommend Similar<br/>Movies]
+    end
+    
+    subgraph "📈 Popularity Strategy"
+        POP --> LC[❤️ Count Likes]
+        LC --> SR[⭐ Sort by Rating]
+        SR --> REC3[🎯 Top Popular Movies]
+    end
+    
+    REC1 --> RESULT[📋 Recommendations]
+    REC2 --> RESULT
+    REC3 --> RESULT
+    
+    %% Fallbacks
+    CF -.->|No user data| POP
+    CB -.->|No likes| POP
+    
+    %% Styling
+    classDef user fill:#e3f2fd
+    classDef service fill:#fff3e0
+    classDef strategy fill:#ffebee
+    classDef ml fill:#fce4ec
+    classDef result fill:#e8f5e8
+    
+    class U user
+    class RS,SF,A service
+    class CF,CB,POP strategy
+    class UM,CS,SU,LM,FE,TF,CS2,LC,SR ml
+    class REC1,REC2,REC3,RESULT result
 ---
 
 **Arquitetura implementada com ❤️ seguindo princípios SOLID e Clean Architecture**
