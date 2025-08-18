@@ -21,6 +21,7 @@ interface Movie {
   year: string;
   created_at: string;
   updated_at: string;
+  is_liked: boolean;
 }
 
 interface MovieListResponse {

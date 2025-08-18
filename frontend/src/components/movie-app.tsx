@@ -13,16 +13,10 @@ export function MovieApp() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [moviesPage, setMoviesPage] = useState(1);
   const [moviesTotalPages, setMoviesTotalPages] = useState(1);
-  const [recommendations, setRecommendations] = useState<{
-    popularity: Movie[];
-    collaborative: Movie[];
-    content_based: Movie[];
-  }>({
-    popularity: [],
-    collaborative: [],
-    content_based: []
-  });
-  const [likedMovies, setLikedMovies] = useState<Set<number>>(new Set());
+  const [selectedAlgorithm, setSelectedAlgorithm] = useState<RecommendationAlgorithm>('popularity');
+  const [recommendations, setRecommendations] = useState<Movie[]>([]);
+  const [recommendationsPage, setRecommendationsPage] = useState(1);
+  const [recommendationsTotalPages, setRecommendationsTotalPages] = useState(1);
   const { toast } = useToast();
 
   // Check authentication on mount
@@ -56,25 +50,9 @@ export function MovieApp() {
       setMoviesPage(moviesResponse.page);
       setMoviesTotalPages(moviesResponse.total_pages);
 
-      // Load recommendations for all algorithms (only on first load)
+      // Load initial recommendations (only on first load)
       if (page === 1) {
-        const [popularRecs, collaborativeRecs, contentRecs] = await Promise.all([
-          apiClient.getRecommendations('popularity', 1, 20).catch(() => ({ movies: [] as Movie[] })),
-          apiClient.getRecommendations('collaborative', 1, 20).catch(() => ({ movies: [] as Movie[] })),
-          apiClient.getRecommendations('content_based', 1, 20).catch(() => ({ movies: [] as Movie[] }))
-        ]);
-
-        setRecommendations({
-          popularity: popularRecs.movies,
-          collaborative: collaborativeRecs.movies,
-          content_based: contentRecs.movies
-        });
-      }
-
-      // Extract liked movies from recommendations to set initial state
-      // Since we don't have a dedicated "liked movies" endpoint, we'll track them locally
-      if (page === 1) {
-        setLikedMovies(new Set());
+        await loadRecommendations(selectedAlgorithm, 1);
       }
       
     } catch (error) {
@@ -86,6 +64,18 @@ export function MovieApp() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadRecommendations = async (algorithm: RecommendationAlgorithm, page: number = 1) => {
+    try {
+      const recommendationsResponse = await apiClient.getRecommendations(algorithm, page, 20);
+      setRecommendations([...recommendationsResponse.movies]); // Force re-render with spread operator
+      setRecommendationsPage(recommendationsResponse.page);
+      setRecommendationsTotalPages(recommendationsResponse.total_pages);
+    } catch (error) {
+      console.error(`Failed to load ${algorithm} recommendations:`, error);
+      setRecommendations([]);
     }
   };
 
@@ -143,12 +133,7 @@ export function MovieApp() {
     apiClient.logout();
     setIsAuthenticated(false);
     setMovies([]);
-    setRecommendations({
-      popularity: [],
-      collaborative: [],
-      content_based: []
-    });
-    setLikedMovies(new Set());
+    setRecommendations([]);
     
     toast({
       title: "Sessão encerrada",
@@ -160,36 +145,34 @@ export function MovieApp() {
     try {
       const response = await apiClient.toggleLike(movieId);
       
+      // Show feedback to user
       if (response.is_liked) {
-        setLikedMovies(prev => new Set([...prev, movieId]));
         toast({
           title: "Filme curtido!",
           description: "Adicionado às suas preferências"
         });
       } else {
-        setLikedMovies(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(movieId);
-          return newSet;
-        });
         toast({
           title: "Curtida removida",
           description: "Removido das suas preferências"
         });
       }
 
-      // Refresh collaborative recommendations after like/unlike
+      // Refresh both listings after like/unlike
       setTimeout(async () => {
         try {
-          const newCollaborativeRecs = await apiClient.getRecommendations('collaborative', 1, 20);
-          setRecommendations(prev => ({
-            ...prev,
-            collaborative: newCollaborativeRecs.movies
-          }));
+          // Refresh "🎬 Descobrir Filmes" list on current page
+          const moviesResponse = await apiClient.getMovies(moviesPage, 20);
+          setMovies([...moviesResponse.movies]); // Force re-render with spread operator
+          
+          // Refresh recommendations list on current page (only if we have recommendations)
+          if (recommendations.length > 0 || recommendationsPage > 0) {
+            await loadRecommendations(selectedAlgorithm, recommendationsPage);
+          }
         } catch (error) {
-          console.error("Failed to refresh recommendations:", error);
+          console.error("Failed to refresh data after like:", error);
         }
-      }, 1000);
+      }, 500);
     } catch (error) {
       toast({
         title: "Falha ao atualizar preferência",
@@ -228,45 +211,82 @@ export function MovieApp() {
       <Header onLogout={handleLogout} />
       
       <main className="container mx-auto px-4 py-8 space-y-12">
+        {/* Informational Banner */}
+        <div className="bg-gradient-to-r from-blue-600/10 to-purple-600/10 border border-blue-500/20 rounded-lg p-6 mb-8">
+          <div className="flex items-start gap-4">
+            <div className="flex-shrink-0">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold text-foreground mb-2">
+                💡 Como melhorar suas recomendações
+              </h2>
+              <p className="text-muted-foreground leading-relaxed">
+                Curta os filmes que você gosta clicando no coração ❤️. Quanto mais filmes você curtir, 
+                melhor nossos algoritmos de recomendação entenderão seu gosto e poderão sugerir filmes 
+                personalizados para você e outros usuários com preferências similares.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                  🎯 Recomendações personalizadas
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                  🤝 Filtragem colaborativa
+                </span>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                  📊 Análise de conteúdo
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* All Movies */}
         <MovieGrid
           movies={movies}
           title="🎬 Descobrir Filmes"
           onLike={handleLike}
-          likedMovies={likedMovies}
           currentPage={moviesPage}
           totalPages={moviesTotalPages}
           onPageChange={handlePageChange}
           isLoading={isLoading}
         />
 
-        {/* Popularity-based Recommendations */}
-        {recommendations.popularity.length > 0 && (
-          <MovieGrid
-            movies={recommendations.popularity}
-            title="🔥 Mais Populares"
-            onLike={handleLike}
-            likedMovies={likedMovies}
-          />
-        )}
+        {/* Algorithm Selection */}
+        <div className="flex items-center gap-4 mb-6">
+          <label htmlFor="algorithm-select" className="text-lg font-semibold text-foreground">
+            Algoritmo de Recomendação:
+          </label>
+          <select
+            id="algorithm-select"
+            value={selectedAlgorithm}
+            onChange={(e) => {
+              const algorithm = e.target.value as RecommendationAlgorithm;
+              setSelectedAlgorithm(algorithm);
+              loadRecommendations(algorithm, 1);
+            }}
+            className="px-4 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="popularity">🔥 Mais Populares</option>
+            <option value="collaborative">✨ Filtragem Colaborativa</option>
+            <option value="content_based">🎯 Baseado em Conteúdo</option>
+          </select>
+        </div>
 
-        {/* Collaborative Filtering Recommendations */}
-        {recommendations.collaborative.length > 0 && (
+        {/* Recommendations */}
+        {recommendations.length > 0 && (
           <MovieGrid
-            movies={recommendations.collaborative}
-            title="✨ Recomendados para Você (Colaborativo)"
+            movies={recommendations}
+            title={`Recomendações - ${selectedAlgorithm === 'popularity' ? '🔥 Mais Populares' : selectedAlgorithm === 'collaborative' ? '✨ Filtragem Colaborativa' : '🎯 Baseado em Conteúdo'}`}
             onLike={handleLike}
-            likedMovies={likedMovies}
-          />
-        )}
-
-        {/* Content-based Recommendations */}
-        {recommendations.content_based.length > 0 && (
-          <MovieGrid
-            movies={recommendations.content_based}
-            title="🎯 Baseado em Conteúdo"
-            onLike={handleLike}
-            likedMovies={likedMovies}
+            currentPage={recommendationsPage}
+            totalPages={recommendationsTotalPages}
+            onPageChange={(page) => loadRecommendations(selectedAlgorithm, page)}
+            isLoading={isLoading}
           />
         )}
       </main>

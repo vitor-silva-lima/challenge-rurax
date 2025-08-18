@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -19,18 +19,23 @@ interface Movie {
   year: string;
   created_at: string;
   updated_at: string;
+  is_liked: boolean;
 }
 
 interface MovieCardProps {
   movie: Movie;
   onLike?: (movieId: number, liked: boolean) => void;
-  isLiked?: boolean;
   className?: string;
 }
 
-export function MovieCard({ movie, onLike, isLiked = false, className }: MovieCardProps) {
-  const [liked, setLiked] = useState(isLiked);
+export function MovieCard({ movie, onLike, className }: MovieCardProps) {
+  const [liked, setLiked] = useState(movie.is_liked);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Update liked state when movie.is_liked changes
+  useEffect(() => {
+    setLiked(movie.is_liked);
+  }, [movie.is_liked]);
 
   const handleLike = async () => {
     if (isLoading) return;
@@ -51,9 +56,25 @@ export function MovieCard({ movie, onLike, isLiked = false, className }: MovieCa
   };
 
   return (
-    <div className={cn("cinema-card rounded-lg overflow-hidden group relative", className)}>
+    <div 
+      className={cn(
+        "cinema-card rounded-lg overflow-hidden group relative cursor-pointer",
+        "hover:scale-105 transition-transform duration-200",
+        "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+        className
+      )}
+      onClick={handleLike}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleLike();
+        }
+      }}
+    >
       {/* Movie Poster */}
-      <div className="aspect-[2/3] bg-muted relative overflow-hidden">
+      <div className="aspect-[5/3] bg-muted relative overflow-hidden">
         {movie.poster_path ? (
           <img 
             src={movie.poster_path} 
@@ -71,13 +92,16 @@ export function MovieCard({ movie, onLike, isLiked = false, className }: MovieCa
         
         {/* Like Button Overlay */}
         <button
-          onClick={handleLike}
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent card click when clicking the heart button
+            handleLike();
+          }}
           disabled={isLoading}
           className={cn(
             "absolute top-3 right-3 p-2 rounded-full bg-black/70 backdrop-blur-sm",
-            "cinema-like-btn opacity-0 group-hover:opacity-100 transition-all duration-300",
+            "cinema-like-btn transition-all duration-300",
             "hover:bg-black/90 focus:outline-none focus:ring-2 focus:ring-primary",
-            liked && "liked opacity-100"
+            liked && "liked"
           )}
           aria-label={liked ? "Unlike movie" : "Like movie"}
         >

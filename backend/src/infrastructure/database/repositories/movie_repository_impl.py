@@ -113,6 +113,12 @@ class MovieRepositoryImpl(MovieRepository):
             .first()
         return self._model_to_entity(movie_model) if movie_model else None
 
+    def get_by_title(self, title: str) -> Optional[Movie]:
+        movie_model = self.db.query(MovieModel)\
+            .filter(MovieModel.title == title.strip())\
+            .first()
+        return self._model_to_entity(movie_model) if movie_model else None
+
     def get_all(
         self,
         page: int = 1,

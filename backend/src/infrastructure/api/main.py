@@ -15,6 +15,9 @@ from src.infrastructure.api.controllers.like_controller import (
 from src.infrastructure.api.controllers.recommendation_controller import (
     router as recommendation_router
 )
+from src.infrastructure.api.controllers.csv_controller import (
+    router as csv_router
+)
 from src.infrastructure.config.settings import settings
 from src.infrastructure.config.logging import configure_logging
 
@@ -74,6 +77,12 @@ def create_application() -> FastAPI:
         router=recommendation_router,
         prefix=f"{settings.api_v1_str}/recommendations",
         tags=["Recommendations"]
+    )
+
+    app.include_router(
+        router=csv_router,
+        prefix=f"{settings.api_v1_str}/csv",
+        tags=["CSV Import"]
     )
 
     # Health check endpoint

@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from pydantic import Field
+from pydantic import Field, ConfigDict
 from pydantic_settings import BaseSettings
 
 load_dotenv()
@@ -18,10 +18,10 @@ class Settings(BaseSettings):
 
     # JWT Security
     secret_key: str = Field(
-        default=os.getenv(
+        default=str(os.getenv(
             key="JWT_SECRET_KEY",
             default="your-secret-key-change-in-production"
-        ),
+        )),
         description="Secret key for JWT"
     )
     algorithm: str = Field(default="HS256", description="JWT algorithm")
@@ -47,9 +47,11 @@ class Settings(BaseSettings):
         description="Project name",
     )
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    model_config = ConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        extra="ignore"  # Ignore extra fields instead of generating an error
+    )
 
 
 # Global instance of settings

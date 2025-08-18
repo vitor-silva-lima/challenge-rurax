@@ -18,13 +18,13 @@ interface Movie {
   year: string;
   created_at: string;
   updated_at: string;
+  is_liked: boolean;
 }
 
 interface MovieGridProps {
   movies: Movie[];
   title: string;
   onLike?: (movieId: number, liked: boolean) => void;
-  likedMovies?: Set<number>;
   className?: string;
   // Pagination props
   currentPage?: number;
@@ -37,7 +37,6 @@ export function MovieGrid({
   movies, 
   title, 
   onLike, 
-  likedMovies = new Set(), 
   className,
   currentPage,
   totalPages,
@@ -67,7 +66,6 @@ export function MovieGrid({
             key={movie.id}
             movie={movie}
             onLike={onLike}
-            isLiked={likedMovies.has(movie.id)}
           />
         ))}
       </div>

@@ -22,6 +22,10 @@ class MovieRepository(ABC):
         pass
 
     @abstractmethod
+    def get_by_title(self, title: str) -> Optional[Movie]:
+        pass
+
+    @abstractmethod
     def get_all(
         self,
         page: int = 1,
