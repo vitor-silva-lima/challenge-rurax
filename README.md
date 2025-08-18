@@ -158,7 +158,7 @@ recommendation_service.register_strategy(
 )
 ```
 
-## 🎯 Casos de Uso Implementados
+## 🎯 Principais Casos de Uso Implementados
 
 ### Autenticação
 - ✅ **RegisterUserUseCase**: Registrar novo usuário
@@ -167,7 +167,11 @@ recommendation_service.register_strategy(
 ### Core
 - ⏳ **GetMoviesUseCase**: Listar filmes
 - ⏳ **LikeMovieUseCase**: Curtir filme
-- ⏳ **GetRecommendationsUseCase**: Obter recomendações
+- ⏳ **GetRecommendationsUseCase**: Obter recomendações (Popularidade, Filtragem colaborativa e Baseada em Conteúdo ) podendo ser extensivel para mais algoritmos.
+- ⏳ **ImportMoviesCsvUseCase**:
+
+### Testes Unitarios
+ - backend/tests
 
 
 ### Clean Architecture
