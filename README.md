@@ -1,5 +1,8 @@
 # Sistema de Recomendação de Filmes - Clean Architecture
 
+## 🚀 Ambiente Online
+- [Rurax CineMatch Application](https://challengerurax-frontend-qzxhga-218842-212-85-11-41.traefik.me/)
+
 Um sistema backend completo para recomendação de filmes desenvolvido em Python 3.11 com FastAPI, implementando **Clean Architecture** (Arquitetura Limpa) com separação clara de responsabilidades.
 
 ## 🏗️ Nova Arquitetura - Clean Architecture
