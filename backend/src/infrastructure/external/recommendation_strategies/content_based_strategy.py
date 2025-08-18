@@ -20,13 +20,15 @@ class ContentBasedStrategy(RecommendationStrategy):
         self,
         like_repository: LikeRepository,
         movie_repository: MovieRepository,
-        similarity_threshold: float = 0.1,
-        max_recommendations: int = 100
+        similarity_threshold: float = 0.05,  # Reduzido para ser mais inclusivo
+        max_recommendations: int = 100,
+        min_recommendations: int = 10  # Garantir um mínimo de recomendações
     ):
         self.like_repository = like_repository
         self.movie_repository = movie_repository
         self.similarity_threshold = similarity_threshold
         self.max_recommendations = max_recommendations
+        self.min_recommendations = min_recommendations
 
     def recommend(
         self,
@@ -126,25 +128,37 @@ class ContentBasedStrategy(RecommendationStrategy):
             if int(movie_id) in liked_movie_ids_set
         ]
 
-        for liked_idx in liked_indices:
-            # Calculate cosine similarity between
-            # this liked movie and all others
-            similarities = cosine_similarity(
-                tfidf_matrix[liked_idx:liked_idx+1],
-                tfidf_matrix
-            )[0]
+        # Calcular similaridade máxima ao invés de média
+        # Isso ajuda quando usuário tem gostos diversos
+        for idx, movie_id in enumerate(movie_features['movie_id']):
+            movie_id = int(movie_id)
+            if movie_id not in liked_movie_ids_set:
+                max_similarity = 0
 
-            for idx, similarity in enumerate(similarities):
-                movie_id = int(movie_features['movie_id'].iloc[idx])
-                # Accumulate similarity scores
-                if movie_id not in movie_similarities:
-                    movie_similarities[movie_id] = 0
-                movie_similarities[movie_id] += similarity
+                for liked_idx in liked_indices:
+                    similarity = cosine_similarity(
+                        tfidf_matrix[liked_idx:liked_idx+1],
+                        tfidf_matrix[idx:idx+1]
+                    )[0][0]
+                    max_similarity = max(max_similarity, similarity)
 
-        # Normalize by number of liked movies
-        if liked_indices:
+                movie_similarities[movie_id] = max_similarity
+
+        # Se a similaridade TF-IDF for muito baixa para todos os filmes,
+        # combinar com similaridade de gêneros para aumentar diversidade
+        if movie_similarities and max(movie_similarities.values()) < 0.1:
+            genre_similarities = self._calculate_genre_similarity(
+                all_movies, liked_movies
+            )
+
+            # Combinar as duas abordagens (70% TF-IDF, 30% gêneros)
             for movie_id in movie_similarities:
-                movie_similarities[movie_id] /= len(liked_indices)
+                if movie_id in genre_similarities:
+                    combined_score = (
+                        0.7 * movie_similarities[movie_id] +
+                        0.3 * genre_similarities[movie_id]
+                    )
+                    movie_similarities[movie_id] = combined_score
 
         return movie_similarities
 
@@ -196,7 +210,7 @@ class ContentBasedStrategy(RecommendationStrategy):
         liked_movies: List
     ) -> Dict[int, float]:
 
-        # Extract genres from liked movies
+        # Extract genres from liked movies with weights
         liked_genres = Counter()
         for movie in liked_movies:
             if movie.genres:
@@ -206,23 +220,39 @@ class ContentBasedStrategy(RecommendationStrategy):
                 except (json.JSONDecodeError, TypeError):
                     continue
 
+        if not liked_genres:
+            return {}
+
         # Calculate similarity for all movies
         movie_similarities = {}
+        total_liked_genres = sum(liked_genres.values())
+
         for movie in all_movies:
             movie_id = int(movie.id)  # Ensure Python int
+            similarity = 0
+
             if movie.genres:
                 try:
                     movie_genres = set(json.loads(movie.genres))
-                    # Calculate Jaccard similarity with liked genres
-                    common_genres = len(
-                        movie_genres.intersection(liked_genres.keys())
-                    )
-                    total_genres = len(
-                        movie_genres.union(liked_genres.keys())
-                    )
-                    if total_genres > 0:
-                        similarity = common_genres / total_genres
-                        movie_similarities[movie_id] = similarity
+
+                    # Calcular similaridade baseada na freq dos gêneros
+                    # Quanto mais um gênero foi curtido, maior o peso
+                    for genre in movie_genres:
+                        if genre in liked_genres:
+                            # Peso do gênero baseado na frequência
+                            weight = liked_genres[genre] / total_liked_genres
+                            similarity += weight
+
+                    # Normalizar pela quantidade de gêneros do filme
+                    # para não penalizar filmes com muitos gêneros
+                    if movie_genres:
+                        similarity = similarity / len(movie_genres)
+
+                    # Bonus para filmes com pelo menos um gênero comum
+                    if similarity > 0:
+                        similarity = min(1.0, similarity * 1.2)
+
+                    movie_similarities[movie_id] = similarity
                 except (json.JSONDecodeError, TypeError):
                     movie_similarities[movie_id] = 0
             else:
@@ -236,23 +266,40 @@ class ContentBasedStrategy(RecommendationStrategy):
         liked_movie_ids: Set[int]
     ) -> List[int]:
 
-        # Filter out already liked movies and low similarity scores
-        recommendations = []
+        # Filter out already liked movies
+        candidates = []
         for movie_id, similarity in movie_similarities.items():
-            if (
-                movie_id not in liked_movie_ids
-                and similarity > self.similarity_threshold
-            ):
-                recommendations.append((movie_id, similarity))
+            if movie_id not in liked_movie_ids:
+                candidates.append((movie_id, similarity))
 
         # Sort by similarity score (descending)
-        recommendations.sort(key=lambda x: x[1], reverse=True)
+        candidates.sort(key=lambda x: x[1], reverse=True)
+
+        # Estratégia adaptativa: se não temos recomendações suficientes
+        # com o threshold padrão, reduzimos gradualmente
+        recommendations = []
+        current_threshold = self.similarity_threshold
+
+        while (len(recommendations) < self.min_recommendations
+               and current_threshold > 0.01
+               and candidates):
+
+            recommendations = [
+                movie_id for movie_id, similarity in candidates
+                if similarity > current_threshold
+            ]
+
+            if len(recommendations) < self.min_recommendations:
+                current_threshold *= 0.5  # Reduz threshold pela metade
+
+        # Se ainda não temos recomendações suficientes,
+        # pegamos as melhores disponíveis
+        if (len(recommendations) < self.min_recommendations
+                and candidates):
+            recommendations = [movie_id for movie_id, _ in candidates]
 
         # Return top recommendations (max_recommendations)
-        return [
-            movie_id for movie_id, _
-            in recommendations[:self.max_recommendations]
-        ]
+        return recommendations[:self.max_recommendations]
 
     def _fallback_to_popularity(
         self,
@@ -280,5 +327,7 @@ class ContentBasedStrategy(RecommendationStrategy):
         return (
             "Recommends movies similar to those you've already liked "
             "based on genres, title, and overview using TF-IDF and "
-            "cosine similarity"
+            "cosine similarity. Adaptively adjusts similarity thresholds "
+            "to handle diverse user preferences and ensures minimum "
+            "recommendation counts."
         )
