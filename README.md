@@ -5,7 +5,7 @@
 
 Um sistema backend completo para recomendação de filmes desenvolvido em Python 3.11 com FastAPI, implementando **Clean Architecture** (Arquitetura Limpa) com separação clara de responsabilidades.
 
-## 🏗️ Nova Arquitetura - Clean Architecture
+## 🏗️ Arquitetura - Clean Architecture
 
 ### Princípios Implementados
 
@@ -55,7 +55,7 @@ src/
    JWT/bcrypt           DTOs         Value Objects
 ```
 
-### Benefícios da Nova Arquitetura
+### Benefícios da Arquitetura
 
 1. **Domínio Puro**: Entidades não dependem de frameworks externos
 2. **Casos de Uso Claros**: Lógica de negócio bem definida e testável
@@ -100,7 +100,6 @@ cp .env.example .env
 ### 2. Inicializar Banco de Dados
 
 ```bash
-# Nova versão com Clean Architecture
 python scripts/init_db.py
 ```
 
@@ -118,7 +117,7 @@ A aplicação estará disponível em: http://localhost:8000
 
 ## 📖 Documentação da API
 
-### Endpoints Implementados (Nova Arquitetura)
+### Endpoints Implementados
 
 #### Autenticação
 - `POST /api/v1/auth/register` - Registrar usuário
