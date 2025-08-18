@@ -1,0 +1,26 @@
+
+services:
+  server:
+    container_name: app-rurax-backend
+    build:
+      context: .
+    ports:
+      - 8000:8000
+    network_mode: service:db
+
+  db:
+      container_name: db-rurax-backend
+      image: postgres:latest
+      restart: unless-stopped
+      volumes:
+        - postgres-data:/var/lib/postgresql/data
+      environment:
+        POSTGRES_USER: postgres
+        POSTGRES_DB: postgres
+        POSTGRES_PASSWORD: postgres
+      ports:
+        - "5432:5432"
+
+
+volumes:
+  postgres-data:
